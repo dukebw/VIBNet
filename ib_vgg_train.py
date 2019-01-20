@@ -90,6 +90,9 @@ def main():
         start_epoch = state_dict['epoch']
         print('loaded checkpoint {} at epoch {} with acc {}'.format(args.resume, state_dict['epoch'], state_dict['prec1'])) 
     
+    # NOTE(brendan): This part seems to be copying state from the pretrained
+    # model to the IB VGG model, accounting for the new parameters z_mu, and
+    # z_logD, in both conv and FC layers.
     if args.resume_vgg_pt:
         # VGG model trained without IB params
         state_dict = torch.load(args.resume_vgg_pt, map_location='cpu')

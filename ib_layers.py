@@ -24,6 +24,8 @@ class InformationBottleneck(Module):
     def __init__(self, dim, mask_thresh=0, init_mag=9, init_var=0.01,
                 kl_mult=1, divide_w=False, sample_in_training=True, sample_in_testing=False, masking=False):
         super(InformationBottleneck, self).__init__()
+        # NOTE(brendan): Although this prior_z_logD isn't used, it is needed
+        # due to some hardcoded counting of parameters in ib_vgg_train.py.
         self.prior_z_logD = Parameter(torch.Tensor(dim))
         self.post_z_mu = Parameter(torch.Tensor(dim))
         self.post_z_logD = Parameter(torch.Tensor(dim))
@@ -90,23 +92,21 @@ class InformationBottleneck(Module):
             z_scale = Variable(self.get_mask_weighted(self.mask_thresh))
         self.kld = self.kl_closed_form(x)
         new_shape = self.adapt_shape(z_scale.size(), x.size())
-        return x * z_scale.view(new_shape)  
+        return x * z_scale.view(new_shape)
 
     def kl_closed_form(self, x):
         new_shape = self.adapt_shape(self.post_z_mu.size(), x.size())
 
-
         h_D = torch.exp(self.post_z_logD.view(new_shape))
         h_mu = self.post_z_mu.view(new_shape)
 
+        # TODO(brendan): Why is the KLD scaled by C_in / C_out?
         KLD = torch.sum(torch.log(1 + h_mu.pow(2)/(h_D + self.epsilon) )) * x.size(1) / h_D.size(1)
 
         if x.dim() > 2:
             if self.divide_w:
-                # divide it by the width
+                # multiply by the width
                 KLD *= x.size()[2]
             else:
                 KLD *= np.prod(x.size()[2:])
         return KLD * 0.5 * self.kl_mult
-
-
