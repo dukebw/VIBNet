@@ -2,13 +2,10 @@ import math
 
 import torch
 from torch.nn.parameter import Parameter
-import torch.nn.functional as F
 from torch import nn
 from torch.nn.modules import Module
 from torch.autograd import Variable
-from torch.nn.modules import utils
 import numpy as np
-import pdb
 
 def reparameterize(mu, logvar, batch_size, cuda=False, sampling=True):
     # output dim: batch_size * dim
@@ -22,7 +19,7 @@ def reparameterize(mu, logvar, batch_size, cuda=False, sampling=True):
 
 class InformationBottleneck(Module):
     def __init__(self, dim, mask_thresh=0, init_mag=9, init_var=0.01,
-                kl_mult=1, divide_w=False, sample_in_training=True, sample_in_testing=False, masking=False):
+                kl_mult=1, divide_w=False, sample_in_training=True, sample_in_testing=False):
         super(InformationBottleneck, self).__init__()
         # NOTE(brendan): Although this prior_z_logD isn't used, it is needed
         # due to some hardcoded counting of parameters in ib_vgg_train.py.
@@ -34,20 +31,16 @@ class InformationBottleneck(Module):
         self.dim = dim
         self.sample_in_training = sample_in_training
         self.sample_in_testing = sample_in_testing
-        # if masking=True, apply mask directly
-        self.masking = masking
 
         # initialization
-        stdv = 1. / math.sqrt(dim)
         self.post_z_mu.data.normal_(1, init_var)
         self.prior_z_logD.data.normal_(-init_mag, init_var)
         self.post_z_logD.data.normal_(-init_mag, init_var)
 
         self.need_update_z = True # flag for updating z during testing
         self.mask_thresh = mask_thresh
-        self.kl_mult=kl_mult
-        self.divide_w=divide_w
-
+        self.kl_mult = kl_mult
+        self.divide_w = divide_w
 
     def adapt_shape(self, src_shape, x_shape):
         # to distinguish conv layers and fc layers
@@ -78,11 +71,6 @@ class InformationBottleneck(Module):
 
     def forward(self, x):
         # 4 modes: sampling, hard mask, weighted mask, use mean value
-        if self.masking:
-            mask = self.get_mask_hard(self.mask_thresh)
-            new_shape = self.adapt_shape(mask.size(), x.size())
-            return x * Variable(mask.view(new_shape))
-
         bsize = x.size(0)
         if (self.training and self.sample_in_training) or (not self.training and self.sample_in_testing):
             z_scale = reparameterize(self.post_z_mu, self.post_z_logD, bsize, cuda=True, sampling=True)

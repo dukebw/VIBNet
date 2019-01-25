@@ -101,7 +101,7 @@ def main():
         except:
             pass
         # match the state dicts
-        ib_keys, vgg_keys = model.state_dict().keys(), state_dict['state_dict'].keys()
+        ib_keys, vgg_keys = list(model.state_dict().keys()), list(state_dict['state_dict'].keys())
         for i in range(13):
             for j in range(6):
                 model.state_dict()[ib_keys[i*9+j]].copy_(state_dict['state_dict'][vgg_keys[i*6+j]])
@@ -115,10 +115,16 @@ def main():
         state_dict = torch.load(args.resume_vgg_vib)
         print('loaded pretraind model with acc {}'.format(state_dict['prec1']))
         # match the state dicts
-        ib_keys, vgg_keys = list(model.state_dict().keys()), list(state_dict['state_dict'].keys())
+        ib_keys = [k for k in model.state_dict().keys() if 'num_batches_tracked' not in k]
+        vgg_keys = list(state_dict['state_dict'].keys())
+        # NOTE(brendan): conv_layers.
         for i in range(13):
             for j in range(6):
-                model.state_dict()[ib_keys[i*9+j]].copy_(state_dict['state_dict'][ib_keys[i*9+j]])
+                try:
+                    model.state_dict()[ib_keys[i*9+j]].copy_(state_dict['state_dict'][ib_keys[i*9+j]])
+                except KeyError:
+                    print('failed copy:', ib_keys[i*9+j])
+        # NOTE(brendan): fc_layers
         ib_offset, vgg_offset = 9*13, 6*13
         for i in range(2):
             for j in range(2):
@@ -213,9 +219,9 @@ def train(train_loader, model, criterion, optimizer, epoch, writer):
 
         # measure accuracy and record loss
         prec1 = accuracy(output.data, target)[0]
-        losses.update(ce_loss.data[0], input.size(0))
-        kld_meter.update(kl_total.data[0], input.size(0))
-        top1.update(prec1[0], input.size(0))
+        losses.update(ce_loss.data.item(), input.size(0))
+        kld_meter.update(kl_total.data.item(), input.size(0))
+        top1.update(prec1.item(), input.size(0))
 
         # measure elapsed time
         batch_time.update(time.time() - end)
@@ -255,41 +261,42 @@ def validate(val_loader, model, criterion, epoch, writer, masks=None):
     """
     Run evaluation
     """
-    batch_time = AverageMeter()
-    losses = AverageMeter()
-    top1 = AverageMeter()
+    with torch.no_grad():
+        batch_time = AverageMeter()
+        losses = AverageMeter()
+        top1 = AverageMeter()
 
-    # switch to evaluate mode
-    model.eval()
+        # switch to evaluate mode
+        model.eval()
 
-    end = time.time()
-    for i, (input, target) in enumerate(val_loader):
-        target = target.cuda(async=True)
-        input_var = torch.autograd.Variable(input).cuda()
-        target_var = torch.autograd.Variable(target)
-
-        # compute output
-        output = model(input_var)
-        loss = criterion(output, target_var)
-
-        # measure accuracy and record loss
-        prec1 = accuracy(output.data, target)[0]
-        losses.update(loss.data[0], input.size(0))
-        top1.update(prec1[0], input.size(0))
-
-        # measure elapsed time
-        batch_time.update(time.time() - end)
         end = time.time()
+        for i, (input, target) in enumerate(val_loader):
+            target = target.cuda(async=True)
+            input_var = torch.autograd.Variable(input).cuda()
+            target_var = torch.autograd.Variable(target)
 
-        if i % args.print_freq == 0:
-            print('Test: [{0}/{1}]\t'
-                  'Time {batch_time.val:.3f} ({batch_time.avg:.3f})\t'
-                  'Loss {loss.val:.4f} ({loss.avg:.4f})\t'
-                  'Prec@1 {top1.val:.3f} ({top1.avg:.3f})'.format(
-                      i, len(val_loader), batch_time=batch_time, loss=losses,
-                      top1=top1))
-    print(' * Prec@1 {top1.avg:.3f}'
-          .format(top1=top1))
+            # compute output
+            output = model(input_var)
+            loss = criterion(output, target_var)
+
+            # measure accuracy and record loss
+            prec1 = accuracy(output.data, target)[0]
+            losses.update(loss.data.item(), input.size(0))
+            top1.update(prec1.item(), input.size(0))
+
+            # measure elapsed time
+            batch_time.update(time.time() - end)
+            end = time.time()
+
+            if i % args.print_freq == 0:
+                print('Test: [{0}/{1}]\t'
+                      'Time {batch_time.val:.3f} ({batch_time.avg:.3f})\t'
+                      'Loss {loss.val:.4f} ({loss.avg:.4f})\t'
+                      'Prec@1 {top1.val:.3f} ({top1.avg:.3f})'.format(
+                          i, len(val_loader), batch_time=batch_time, loss=losses,
+                          top1=top1))
+        print(' * Prec@1 {top1.avg:.3f}'
+              .format(top1=top1))
     
 
     return top1.avg
