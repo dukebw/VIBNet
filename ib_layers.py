@@ -25,6 +25,7 @@ class InformationBottleneck(Module):
         # due to some hardcoded counting of parameters in ib_vgg_train.py.
         self.prior_z_logD = Parameter(torch.Tensor(dim))
         self.post_z_mu = Parameter(torch.Tensor(dim))
+        # NOTE(brendan): This thing is log variance.
         self.post_z_logD = Parameter(torch.Tensor(dim))
 
         self.epsilon = 1e-8
@@ -51,6 +52,8 @@ class InformationBottleneck(Module):
             new_shape += [1 for i in range(len(x_shape)-2)]
         return new_shape
 
+    # NOTE(brendan): This is actually negative log alpha (assuming post_z_mu is
+    # mu, and post_z_logD is log sigma^2).
     def get_logalpha(self):
         return self.post_z_logD.data - torch.log(self.post_z_mu.data.pow(2) + self.epsilon)
 
@@ -61,6 +64,10 @@ class InformationBottleneck(Module):
 
     def get_mask_hard(self, threshold=0):
         logalpha = self.get_logalpha()
+        # NOTE(brendan): logalpha < threshold => -log mu^2/sigma^2 < 0 =>
+        # sigma^2/mu^2 < 1.
+        #
+        # So, hard_mask == 1 if |mu| > |sigma|, 0 otherwise.
         hard_mask = (logalpha < threshold).float()
         return hard_mask
 
@@ -82,6 +89,7 @@ class InformationBottleneck(Module):
         new_shape = self.adapt_shape(z_scale.size(), x.size())
         return x * z_scale.view(new_shape)
 
+    # NOTE(brendan): Equation 8 in the paper.
     def kl_closed_form(self, x):
         new_shape = self.adapt_shape(self.post_z_mu.size(), x.size())
 
