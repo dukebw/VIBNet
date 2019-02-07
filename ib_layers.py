@@ -7,6 +7,7 @@ from torch.nn.modules import Module
 from torch.autograd import Variable
 import numpy as np
 
+# NOTE(brendan): Returns factor (u + eps*std) from Equation 5 in the paper.
 def reparameterize(mu, logvar, batch_size, cuda=False, sampling=True):
     # output dim: batch_size * dim
     if sampling:
@@ -46,10 +47,10 @@ class InformationBottleneck(Module):
     def adapt_shape(self, src_shape, x_shape):
         # to distinguish conv layers and fc layers
         # see if we need to expand the dimension of x
-        new_shape = src_shape if len(src_shape)==2 else (1, src_shape[0])
-        if len(x_shape)>2:
+        new_shape = src_shape if len(src_shape) == 2 else (1, src_shape[0])
+        if len(x_shape) > 2:
             new_shape = list(new_shape)
-            new_shape += [1 for i in range(len(x_shape)-2)]
+            new_shape += [1 for i in range(len(x_shape) - 2)]
         return new_shape
 
     # NOTE(brendan): This is actually negative log alpha (assuming post_z_mu is
@@ -101,7 +102,7 @@ class InformationBottleneck(Module):
 
         if x.dim() > 2:
             if self.divide_w:
-                # multiply by the width
+                # divide by the width
                 KLD *= x.size()[2]
             else:
                 KLD *= np.prod(x.size()[2:])
