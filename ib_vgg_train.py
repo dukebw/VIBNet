@@ -207,7 +207,6 @@ def train(train_loader, model, criterion, optimizer, epoch, writer):
         ce_loss = criterion(output, target_var)
         
         loss = ce_loss
-        kl_fac = 0
         if kl_fac > 0:
             loss += kl_total * kl_fac
 
