@@ -55,7 +55,7 @@ def _reparametrize(mu, logvar, batch_size, cuda=False, sampling=True):
         # NOTE(brendan): one sample per batch..
         eps = torch.FloatTensor(std.size(0), std.size(1)).cuda(mu.get_device()).normal_()
 
-        return mu.view(*mu.shape) + eps*std.view(*std.shape)
+        return mu.view(*mu.shape) + eps*std
     else:
         return mu.view(*mu.shape)
 
@@ -148,6 +148,7 @@ class VGG_IB(nn.Module):
             z_mu = self.z_mu_all[conv_i]
             z_logD = self.z_logD_all[conv_i]
             if (self.training and self.sample_in_training) or (not self.training and self.sample_in_testing):
+                assert self.training
                 z_scale = _reparametrize(z_mu,
                                          z_logD,
                                          x.size(0),

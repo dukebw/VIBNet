@@ -18,7 +18,8 @@ def main():
         args.ib_lr = args.lr
 
     if args.ib_wd == -1:
-        args.ib_wd = args.weight_decay
+        # args.ib_wd = args.weight_decay
+        args.ib_wd = 0
 
     if not os.path.exists(args.tb_path):
         os.makedirs(args.tb_path)
@@ -206,6 +207,7 @@ def train(train_loader, model, criterion, optimizer, epoch, writer):
         ce_loss = criterion(output, target_var)
         
         loss = ce_loss
+        kl_fac = 0
         if kl_fac > 0:
             loss += kl_total * kl_fac
 
@@ -241,6 +243,23 @@ def train(train_loader, model, criterion, optimizer, epoch, writer):
                       epoch, i, len(train_loader), date=time.strftime("%Y-%m-%d %H:%M:%S"), batch_time=batch_time,
                       forward_time=forward_time, backward_time=backward_time, kl_time=kl_time,
                       data_time=data_time, loss=losses, klds=kld_meter, top1=top1))
+
+            z_mu_max_grad = torch.tensor([z_mu.grad.abs().max() for z_mu in model.z_mu_all]).max()
+            z_mu_min_grad = torch.tensor([z_mu.grad.abs().min() for z_mu in model.z_mu_all]).min()
+            z_mu_mean_grad = torch.tensor([z_mu.grad.mean() for z_mu in model.z_mu_all]).mean()
+            z_logD_max_grad = torch.tensor([z_logD.grad.abs().max() for z_logD in model.z_logD_all]).max()
+            z_logD_min_grad = torch.tensor([z_logD.grad.abs().min() for z_logD in model.z_logD_all]).min()
+            z_logD_mean_grad = torch.tensor([z_logD.grad.mean() for z_logD in model.z_logD_all]).mean()
+            z_mu_max = torch.tensor([z_mu.abs().max() for z_mu in model.z_mu_all]).max()
+            z_mu_min = torch.tensor([z_mu.abs().min() for z_mu in model.z_mu_all]).min()
+            z_mu_mean = torch.tensor([z_mu.mean() for z_mu in model.z_mu_all]).mean()
+            z_logD_max = torch.tensor([z_logD.abs().max() for z_logD in model.z_logD_all]).max()
+            z_logD_min = torch.tensor([z_logD.abs().min() for z_logD in model.z_logD_all]).min()
+            z_logD_mean = torch.tensor([z_logD.mean() for z_logD in model.z_logD_all]).mean()
+            print(f'z_mu grad min {z_mu_min_grad} max {z_mu_max_grad} mean {z_mu_mean_grad}')
+            print(f'z_logD grad min {z_logD_min_grad} max {z_logD_max_grad} mean {z_logD_mean_grad}')
+            print(f'z_mu min {z_mu_min} max {z_mu_max} mean {z_mu_mean}')
+            print(f'z_logD min {z_logD_min} max {z_logD_max} mean {z_logD_mean}')
     print('Date: {date}\t'
         'Epoch: [{0}][{1}/{2}]\t'
         'Time {batch_time.val:.3f} ({batch_time.avg:.3f})\t'
