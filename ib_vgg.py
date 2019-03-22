@@ -165,7 +165,7 @@ class VGG_IB(nn.Module):
                 h_D = torch.exp(z_logD.view(new_shape))
                 h_mu = z_mu.view(new_shape)
 
-                kld = torch.sum(torch.log(1 + h_mu.pow(2)/(h_D + self.eps) )) * x.size(1) / h_D.size(1)
+                kld = torch.sum(torch.log(1 + h_mu.pow(2)/(h_D + self.eps) ))
 
                 if x.dim() > 2:
                     kld *= np.prod(x.size()[2:])
